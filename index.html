@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>महासंग्रह: अक्ल की जीत</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #1a1a2e;
+            --accent: #e94560;
+            --success: #2ecc71;
+            --gold: #f1c40f;
+            --dark-blue: #0f3460;
+            --white: #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: var(--dark-blue); color: var(--white); overflow-x: hidden; }
+
+        header { background: var(--primary); padding: 30px 15px; text-align: center; border-bottom: 3px solid var(--accent); }
+        .victory-title { font-size: 2rem; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; }
+
+        .search-container { padding: 20px; text-align: center; }
+        #searchBar { width: 90%; max-width: 500px; padding: 12px 20px; border-radius: 25px; border: none; outline: none; font-size: 1rem; background: #fff; color: #333; }
+
+        #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; }
+        .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; padding: 20px; }
+        .card { background: var(--primary); border-radius: 15px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); transition: 0.3s; }
+        .card:hover { transform: translateY(-10px); box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        .card img { width: 100%; height: 200px; object-fit: cover; background: #000; }
+
+        .card-body { padding: 15px; }
+        .price { color: var(--gold); font-size: 1.5rem; font-weight: bold; margin: 10px 0; }
+        
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1rem; transition: 0.2s; margin-top: 10px; }
+        .btn-order { background: var(--success); color: white; }
+        .btn-admin-open { background: var(--accent); color: white; position: fixed; bottom: 20px; right: 20px; width: auto; padding: 15px 20px; border-radius: 50px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 100; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--primary); padding: 25px; border-radius: 15px; width: 90%; max-width: 450px; border: 2px solid var(--accent); max-height: 90vh; overflow-y: auto; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; background: #0a0a1a; color: white; }
+
+        @media (max-width: 600px) {
+            .victory-title { font-size: 1.4rem; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loader"><div class="spinner"></div><p style="margin-top:15px;">अक्ल की जीत... प्रतीक्षा करें</p></div>
+
+<header>
+    <div class="victory-title">The Victory of Wisdom</div>
+    <p style="font-size: 0.9rem; opacity: 0.8; margin-top: 5px;">तामीर अली महासंग्रह: खुदा की तलाश</p>
+</header>
+
+<div class="search-container">
+    <input type="text" id="searchBar" placeholder="अपना सामान खोजें..." onkeyup="searchProducts()">
+</div>
+
+<div class="grid" id="productGrid"></div>
+
+<button class="btn btn-admin-open" onclick="openAdmin()">
+    <i class="fas fa-user-shield"></i> एडमिन पोर्टल
+</button>
+
+<div id="adminModal" class="modal">
+    <div class="modal-content">
+        <h2 style="color:var(--gold); margin-bottom:10px;">नया प्रोडक्ट जोड़ें</h2>
+        <input type="text" id="pName" placeholder="प्रोडक्ट का नाम">
+        <input type="number" id="pPrice" placeholder="कीमत (₹)">
+        <input type="text" id="pImage" placeholder="इमेज Direct URL डालें">
+        <button class="btn btn-order" onclick="saveProduct()">महासंग्रह में जोड़ें</button>
+        
+        <div style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+            <h4 style="color: var(--gold); margin-bottom: 10px;">डेटा सुरक्षा (Backup)</h4>
+            <button class="btn" style="background: #3498db; color: white;" onclick="downloadBackup()">
+                <i class="fas fa-download"></i> बैकअप डाउनलोड करें
+            </button>
+        </div>
+        
+        <button class="btn" style="background:#e74c3c; margin-top: 20px;" onclick="closeModal()">बंद करें</button>
+    </div>
+</div>
+
+<script>
+    const ADMIN_PASS = "tamir@lI00769";
+
+    function loadProducts() {
+        const grid = document.getElementById('productGrid');
+        const products = JSON.parse(localStorage.getItem('tamir_mahasangrah')) || [];
+        
+        if(products.length === 0) {
+            grid.innerHTML = `<p style="grid-column:1/-1; text-align:center; opacity:0.5; padding:50px;">अभी कोई प्रोडक्ट नहीं है। एडमिन पोर्टल से फोटो लिंक के साथ जोड़ें।</p>`;
+            return;
+        }
+
+        grid.innerHTML = products.map((p, index) => {
+            // इमेज लोडिंग फिक्स
+            const currentImg = p.img ? p.img : 'https://via.placeholder.com/300x200?text=No+Image';
+            
+            return `
+            <div class="card">
+                <img src="${currentImg}" onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=Check+Link';">
+                <div class="card-body">
+                    <h3>${p.name}</h3>
+                    <div class="price">₹${p.price}</div>
+                    <button class="btn btn-order" onclick="orderNow('${p.name}', '${p.price}')">
+                        <i class="fab fa-whatsapp"></i> अभी ऑर्डर करें
+                    </button>
+                    <button onclick="deleteProduct(${index})" style="background:none; border:none; color:#e94560; cursor:pointer; margin-top:10px; font-size:0.8rem;">हटाएं (X)</button>
+                </div>
+            </div>
+        `}).join('');
+    }
+
+    function openAdmin() {
+        let pass = prompt("तामीर अली, एडमिन पासवर्ड दर्ज करें:");
+        if(pass === ADMIN_PASS) {
+            document.getElementById('adminModal').style.display = 'flex';
+        } else {
+            alert("गलत पासवर्ड।");
+        }
+    }
+
+    function closeModal() { document.getElementById('adminModal').style.display = 'none'; }
+
+    function saveProduct() {
+        const name = document.getElementById('pName').value;
+        const price = document.getElementById('pPrice').value;
+        const img = document.getElementById('pImage').value;
+
+        if(!name || !price || !img) {
+            alert("कृपया सभी जानकारी भरें (नाम, कीमत और फोटो लिंक)!");
+            return;
+        }
+
+        let products = JSON.parse(localStorage.getItem('tamir_mahasangrah')) || [];
+        products.push({name, price, img});
+        localStorage.setItem('tamir_mahasangrah', JSON.stringify(products));
+        
+        alert("सफलता! फोटो महासंग्रह में जुड़ गई।");
+        document.getElementById('pName').value = '';
+        document.getElementById('pPrice').value = '';
+        document.getElementById('pImage').value = '';
+        loadProducts();
+    }
+
+    function searchProducts() {
+        let filter = document.getElementById('searchBar').value.toUpperCase();
+        let cards = document.getElementsByClassName('card');
+        for (let i = 0; i < cards.length; i++) {
+            let title = cards[i].getElementsByTagName("h3")[0].innerText;
+            cards[i].style.display = title.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+        }
+    }
+
+    function orderNow(name, price) {
+        const msg = encodeURIComponent(`*नया ऑर्डर: अक्ल की जीत*\n*उत्पाद:* ${name}\n*कीमत:* ₹${price}`);
+        window.open(`https://wa.me/918797221991?text=${msg}`);
+    }
+
+    function downloadBackup() {
+        const data = localStorage.getItem('tamir_mahasangrah');
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mahasangrah_backup.json`;
+        a.click();
+    }
+
+    function deleteProduct(index) {
+        if(confirm("हटाएं?")) {
+            let products = JSON.parse(localStorage.getItem('tamir_mahasangrah'));
+            products.splice(index, 1);
+            localStorage.setItem('tamir_mahasangrah', JSON.stringify(products));
+            loadProducts();
+        }
+    }
+
+    window.onload = loadProducts;
+</script>
+</body>
+</html>
